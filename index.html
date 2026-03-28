@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aleks AI Studio v1.0</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0b0b; color: #00ffcc; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; }
+        .app-container { max-width: 450px; margin: auto; border: 1px solid #333; padding: 20px; border-radius: 25px; background: #111; box-shadow: 0 10px 40px rgba(0,255,204,0.15); min-height: 90vh; display: flex; flex-direction: column; }
+        h1 { font-size: 28px; text-shadow: 0 0 10px #00ffcc; }
+        input { width: calc(100% - 30px); padding: 12px; margin: 10px 0; border-radius: 12px; border: 1px solid #00ffcc; background: #1a1a1a; color: white; outline: none; }
+        button { background: #00ffcc; color: #000; border: none; padding: 12px 25px; cursor: pointer; font-weight: bold; border-radius: 12px; transition: 0.3s; margin: 5px; }
+        button:hover { background: #00cca3; transform: translateY(-2px); }
+        .hidden { display: none; }
+        
+        /* ჩატის სტილი */
+        #chat-box { flex-grow: 1; height: 350px; overflow-y: auto; background: #050505; border-radius: 15px; padding: 15px; text-align: left; margin-bottom: 15px; border: 1px solid #222; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 10px 15px; border-radius: 18px; max-width: 80%; line-height: 1.4; font-size: 15px; word-wrap: break-word; }
+        .user-msg { align-self: flex-end; background: #00ffcc; color: black; border-bottom-right-radius: 2px; }
+        .ai-msg { align-self: flex-start; background: #222; color: #00ffcc; border: 1px solid #333; border-bottom-left-radius: 2px; }
+        
+        .footer { margin-top: auto; font-size: 10px; color: #444; letter-spacing: 2px; padding-top: 10px; }
+        .download-info { font-size: 13px; color: #ffcc00; border: 1px dashed #ffcc00; padding: 15px; border-radius: 15px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="auth-page">
+        <h1>Aleks AI</h1>
+        <p style="color: #888;">Beta v1.0</p>
+        <input type="email" id="user-email" placeholder="შეიყვანეთ თქვენი იმეილი">
+        <button onclick="checkAuth()">შესვლა</button>
+    </div>
+
+    <div id="push-page" class="hidden">
+        <h2>თითქმის მზად ხარ!</h2>
+        <p>ჩართე შეტყობინებები AI-სთან დასაკავშირებლად</p>
+        <button style="padding: 25px; width: 80%;" onclick="requestPush()">ჩართე Notification</button>
+    </div>
+
+    <div id="chat-page" class="hidden">
+        <div id="chat-box"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="user-msg" placeholder="ჰკითხე AI-ს..." onkeypress="if(event.key==='Enter') sendToAI()">
+            <button onclick="sendToAI()">➤</button>
+        </div>
+        <div class="footer">MAKE BY ALEKS STUDIO</div>
+        <button style="background: none; color: #444; text-decoration: underline; font-size: 10px;" onclick="showBeta()">App Info</button>
+    </div>
+
+    <div id="beta-page" class="hidden">
+        <div class="download-info">
+            <p><strong>iOS (iPhone):</strong> დააჭირეთ 'Share' და 'Add to Home Screen'.</p>
+            <p><strong>Android:</strong> დააჭირეთ 'Install' ბრაუზერის მენიუში.</p>
+            <p style="color: red;"><strong>გაფრთხილება:</strong> აპლიკაცია სატესტო რეჟიმშია.</p>
+        </div>
+        <button onclick="hideBeta()">უკან</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+
+    // --- შენი კონფიგურაცია ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyDirpsw1uu9_OFrTI-4x7ctqzELPk1H0ng",
+        authDomain: "aleks-first-ai.firebaseapp.com",
+        projectId: "aleks-first-ai",
+        storageBucket: "aleks-first-ai.firebasestorage.app",
+        messagingSenderId: "618999263356",
+        appId: "1:618999263356:web:d6340bfb767a5b671259f9"
+    };
+    
+    const GEMINI_API_KEY = "AIzaSyAm19iY-OplL5c_1WYsM2A-5lg4wZNoL3o"; 
+
+    initializeApp(firebaseConfig);
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('firebase-messaging-sw.js');
+    }
+
+    window.checkAuth = () => {
+        const email = document.getElementById('user-email').value;
+        if(email.includes('@')) {
+            document.getElementById('auth-page').classList.add('hidden');
+            document.getElementById('push-page').classList.remove('hidden');
+        }
+    };
+
+    window.requestPush = () => {
+        Notification.requestPermission().then(perm => {
+            if(perm === 'granted') enterApp(); else enterApp(); 
+        });
+    };
+
+    function enterApp() {
+        document.getElementById('push-page').classList.add('hidden');
+        document.getElementById('chat-page').classList.remove('hidden');
+        
+        // მისასალმებელი Push
+        setTimeout(() => {
+            new Notification("Aleks AI", { body: "სისტემა მზად არის სამუშაოდ!", icon: "icon-192.png" });
+        }, 1000);
+    }
+
+    window.sendToAI = async () => {
+        const input = document.getElementById('user-msg');
+        const box = document.getElementById('chat-box');
+        const text = input.value.trim();
+        const email = document.getElementById('user-email').value;
+
+        if(!text) return;
+
+        // მომხმარებლის მესიჯი
+        box.innerHTML += `<div class="msg user-msg">${text}</div>`;
+        input.value = "";
+        box.scrollTop = box.scrollHeight;
+
+        // ფიქრის სტატუსი
+        const loading = document.createElement("div");
+        loading.className = "msg ai-msg";
+        loading.innerHTML = "<i>AI ფიქრობს...</i>";
+        box.appendChild(loading);
+
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `შენ ხარ Aleks AI, შექმნილი Aleks Studio-ს მიერ. მომხმარებელია ${email}. უპასუხე მოკლედ. კითხვა: ${text}` }] }]
+                })
+            });
+            const data = await res.json();
+            const aiText = data.candidates[0].content.parts[0].text;
+            loading.innerHTML = `<b>AI:</b> ${aiText}`;
+        } catch (e) {
+            loading.innerHTML = "შეცდომაა კავშირისას.";
+        }
+        box.scrollTop = box.scrollHeight;
+    };
+
+    window.showBeta = () => { document.getElementById('chat-page').classList.add('hidden'); document.getElementById('beta-page').classList.remove('hidden'); };
+    window.hideBeta = () => { document.getElementById('beta-page').classList.add('hidden'); document.getElementById('chat-page').classList.remove('hidden'); };
+</script>
+</body>
+</html>
