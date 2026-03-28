@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aleks AI Studio</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0b0b">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        body { font-family: sans-serif; background: #0b0b0b; color: #00ffcc; text-align: center; margin: 0; padding: 10px; }
+        .app-container { max-width: 450px; margin: auto; border: 1px solid #333; padding: 20px; border-radius: 25px; background: #111; min-height: 85vh; display: flex; flex-direction: column; }
+        #chat-box { flex-grow: 1; height: 350px; overflow-y: auto; background: #050505; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #222; }
+        .msg { padding: 10px; border-radius: 12px; max-width: 85%; word-wrap: break-word; font-size: 15px; }
+        .user-msg { align-self: flex-end; background: #00ffcc; color: black; font-weight: bold; }
+        .ai-msg { align-self: flex-start; background: #222; color: #00ffcc; border: 1px solid #333; }
+        input { width: 80%; padding: 12px; border-radius: 10px; border: 1px solid #00ffcc; background: #1a1a1a; color: white; outline: none; margin: 10px 0; }
+        button { background: #00ffcc; color: black; border: none; padding: 12px 25px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .hidden { display: none !important; }
+        #install-banner { background: #222; padding: 15px; border-radius: 15px; margin-bottom: 10px; border: 1px solid #ffcc00; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="install-banner" class="hidden">
+        <p style="color: #ffcc00; font-size: 14px; margin: 0 0 10px 0;">გსურთ აპლიკაციის ეკრანზე დამატება?</p>
+        <button id="install-btn" style="background: #ffcc00; padding: 8px 15px;">გადმოწერე აპი</button>
+    </div>
+
+    <div id="auth-page">
+        <h1>Aleks AI</h1>
+        <input type="email" id="user-email" placeholder="example@gmail.com">
+        <br>
+        <button id="login-btn">შესვლა</button>
+    </div>
+
+    <div id="chat-page" class="hidden">
+        <div id="chat-box"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="user-msg" placeholder="ჰკითხე AI-ს...">
+            <button id="send-btn">➤</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    const GEMINI_API_KEY = "AIzaSyAm19iY-OplL5c_1WYsM2A-5lg4wZNoL3o"; 
+
+    let deferredPrompt;
+    const installBanner = document.getElementById('install-banner');
+    const installBtn = document.getElementById('install-btn');
+
+    // PWA ინსტალაციის ლოგიკა Android-ისთვის
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBanner.classList.remove('hidden');
+    });
+
+    installBtn.addEventListener('click', () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User installed the app');
+                }
+                installBanner.classList.add('hidden');
+            });
+        }
+    });
+
+    // ... (დანარჩენი Login და Chat ფუნქციები იგივე რჩება) ...
+    // დარწმუნდი რომ ბოლოში გაქვს Service Worker-ის რეგისტრაცია:
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('firebase-messaging-sw.js');
+    }
+
+    // Login ღილაკის მუშაობა
+    document.getElementById('login-btn').onclick = () => {
+        if (document.getElementById('user-email').value.includes('@')) {
+            document.getElementById('auth-page').classList.add('hidden');
+            document.getElementById('chat-page').classList.remove('hidden');
+            Notification.requestPermission();
+        }
+    };
+    
+    // AI-ს ფუნქცია (იგივე რაც წინა კოდში)
+    async function sendMessage() {
+        const input = document.getElementById('user-msg');
+        const box = document.getElementById('chat-box');
+        const text = input.value.trim();
+        if (!text) return;
+        box.innerHTML += `<div class="msg user-msg">${text}</div>`;
+        input.value = "";
+        box.scrollTop = box.scrollHeight;
+        const loading = document.createElement("div");
+        loading.className = "msg ai-msg";
+        loading.innerHTML = "<i>AI ფიქრობს...</i>";
+        box.appendChild(loading);
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] })
+            });
+            const data = await res.json();
+            loading.innerHTML = `<b>AI:</b> ${data.candidates[0].content.parts[0].text}`;
+        } catch (e) { loading.innerHTML = "შეცდომაა."; }
+        box.scrollTop = box.scrollHeight;
+    }
+    document.getElementById('send-btn').onclick = sendMessage;
+</script>
+</body>
+</html>
