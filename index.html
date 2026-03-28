@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aleks AI Studio</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { font-family: sans-serif; background: #0b0b0b; color: #00ffcc; text-align: center; margin: 0; padding: 10px; }
+        .app-container { max-width: 450px; margin: auto; border: 1px solid #333; padding: 20px; border-radius: 25px; background: #111; min-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 0 20px rgba(0,255,204,0.1); }
+        #chat-box { flex-grow: 1; height: 350px; overflow-y: auto; background: #050505; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; border: 1px solid #222; }
+        .msg { padding: 10px; border-radius: 12px; max-width: 85%; word-wrap: break-word; font-size: 15px; }
+        .user-msg { align-self: flex-end; background: #00ffcc; color: black; font-weight: bold; }
+        .ai-msg { align-self: flex-start; background: #222; color: #00ffcc; border: 1px solid #333; }
+        input { width: 80%; padding: 12px; border-radius: 10px; border: 1px solid #00ffcc; background: #1a1a1a; color: white; outline: none; margin: 10px 0; }
+        button { background: #00ffcc; color: black; border: none; padding: 12px 25px; border-radius: 10px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.8; transform: scale(1.02); }
+        .hidden { display: none !important; }
+        .footer { font-size: 10px; color: #444; margin-top: 10px; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="auth-page">
+        <h1 style="text-shadow: 0 0 10px #00ffcc;">Aleks AI</h1>
+        <p style="color: #666;">შეიყვანეთ ნებისმიერი იმეილი</p>
+        <input type="email" id="user-email" placeholder="example@gmail.com">
+        <br>
+        <button id="login-btn">შესვლა</button>
+    </div>
+
+    <div id="chat-page" class="hidden">
+        <div id="chat-box"></div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="user-msg" placeholder="ჰკითხე AI-ს...">
+            <button id="send-btn">➤</button>
+        </div>
+        <div class="footer">MAKE BY ALEKS STUDIO</div>
+    </div>
+</div>
+
+<script type="module">
+    // --- აქ ჩასვი შენი Gemini API Key ---
+    const GEMINI_API_KEY = "AIzaSyAm19iY-OplL5c_1WYsM2A-5lg4wZNoL3o"; 
+
+    const authPage = document.getElementById('auth-page');
+    const chatPage = document.getElementById('chat-page');
+    const emailInput = document.getElementById('user-email');
+    const loginBtn = document.getElementById('login-btn');
+    const sendBtn = document.getElementById('send-btn');
+    const msgInput = document.getElementById('user-msg');
+    const chatBox = document.getElementById('chat-box');
+
+    // შესვლის ლოგიკა
+    loginBtn.onclick = () => {
+        if (emailInput.value.includes('@')) {
+            authPage.classList.add('hidden');
+            chatPage.classList.remove('hidden');
+        } else {
+            alert("გთხოვთ შეიყვანოთ სწორი იმეილი!");
+        }
+    };
+
+    // AI-სთან გაგზავნა
+    async function sendMessage() {
+        const text = msgInput.value.trim();
+        if (!text) return;
+
+        // მომხმარებლის მესიჯი
+        chatBox.innerHTML += `<div class="msg user-msg">${text}</div>`;
+        msgInput.value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        const loading = document.createElement("div");
+        loading.className = "msg ai-msg";
+        loading.innerHTML = "<i>AI ფიქრობს...</i>";
+        chatBox.appendChild(loading);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // ლოკალური მათემატიკის შემოწმება (რომ 2+2-ზე ყოველთვის იმუშაოს)
+        try {
+            const mathEval = eval(text.replace(/[^-()\d/*+.]/g, ''));
+            if (!isNaN(mathEval) && /[\+\-\*\/]/.test(text)) {
+                loading.innerHTML = `<b>AI:</b> პასუხია: ${mathEval}`;
+                return;
+            }
+        } catch(e) {}
+
+        // API-სთან კავშირი
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: text }] }] })
+            });
+            const data = await res.json();
+            if (data.candidates && data.candidates[0].content) {
+                loading.innerHTML = `<b>AI:</b> ${data.candidates[0].content.parts[0].text}`;
+            } else {
+                loading.innerHTML = "<b>AI:</b> უკაცრავად, პასუხი ვერ ვიპოვე.";
+            }
+        } catch (err) {
+            loading.innerHTML = "<b>AI:</b> კავშირის შეცდომა. შეამოწმეთ ინტერნეტი ან API Key.";
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    sendBtn.onclick = sendMessage;
+    msgInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+
+</script>
+</body>
+</html>
