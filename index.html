@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aleks AI Studio</title>
+
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0b0b">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png">
+
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; background: #0b0b0b; color: #00ffcc; text-align: center; margin: 0; padding: 10px; overflow: hidden; }
+        .app-container { max-width: 450px; margin: auto; border: 1px solid #333; padding: 20px; border-radius: 25px; background: #111; height: 90vh; display: flex; flex-direction: column; position: relative; }
+        #install-banner { background: #1a1a1a; border: 1px solid #ffcc00; padding: 10px; border-radius: 15px; margin-bottom: 10px; font-size: 14px; color: #ffcc00; }
+        #install-btn { background: #ffcc00; color: black; border: none; padding: 5px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        #chat-box { flex-grow: 1; overflow-y: auto; background: #050505; border-radius: 15px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 12px; border: 1px solid #222; }
+        .msg { padding: 12px 16px; border-radius: 18px; max-width: 80%; word-wrap: break-word; font-size: 15px; line-height: 1.4; }
+        .user-msg { align-self: flex-end; background: #00ffcc; color: black; border-bottom-right-radius: 2px; font-weight: 500; }
+        .ai-msg { align-self: flex-start; background: #222; color: #00ffcc; border: 1px solid #333; border-bottom-left-radius: 2px; }
+        input { width: 75%; padding: 12px; border-radius: 12px; border: 1px solid #00ffcc; background: #1a1a1a; color: white; outline: none; }
+        button#send-btn { background: #00ffcc; color: black; border: none; padding: 12px 20px; border-radius: 12px; cursor: pointer; font-weight: bold; }
+        .hidden { display: none !important; }
+        .footer { font-size: 9px; color: #444; margin-top: 8px; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="install-banner" class="hidden">
+        გსურთ აპის გადმოწერა? 
+        <button id="install-btn">ინსტალაცია</button>
+    </div>
+
+    <div id="auth-page">
+        <img src="icon-192.png" width="80" style="border-radius: 20px; margin-top: 20px; box-shadow: 0 0 20px rgba(0,255,204,0.3);">
+        <h1 style="margin-top: 15px;">Aleks AI</h1>
+        <input type="email" id="user-email" placeholder="შეიყვანეთ იმეილი">
+        <br><br>
+        <button id="login-btn" style="width: 80%; padding: 15px;">შესვლა</button>
+    </div>
+
+    <div id="chat-page" class="hidden">
+        <div id="chat-box"></div>
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="user-msg" placeholder="მიწერე AI-ს...">
+            <button id="send-btn">➤</button>
+        </div>
+        <div class="footer">MADE BY ALEKS STUDIO</div>
+    </div>
+</div>
+
+<script type="module">
+    // *** აქ ჩასვი შენი API KEY ***
+    const GEMINI_API_KEY = "AIzaSyAm19iY-OplL5c_1WYsM2A-5lg4wZNoL3o"; 
+
+    let deferredPrompt;
+    const loginBtn = document.getElementById('login-btn');
+    const authPage = document.getElementById('auth-page');
+    const chatPage = document.getElementById('chat-page');
+    const chatBox = document.getElementById('chat-box');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        document.getElementById('install-banner').classList.remove('hidden');
+    });
+
+    document.getElementById('install-btn').onclick = () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            document.getElementById('install-banner').classList.add('hidden');
+        }
+    };
+
+    loginBtn.onclick = () => {
+        const email = document.getElementById('user-email').value;
+        if (email.includes('@')) {
+            Notification.requestPermission().then(perm => {
+                authPage.classList.add('hidden');
+                chatPage.classList.remove('hidden');
+                if (perm === 'granted') {
+                    setTimeout(() => sendPush("Aleks AI", "სისტემა მზად არის!"), 1000);
+                }
+            });
+        } else {
+            alert("შეიყვანეთ სწორი იმეილი!");
+        }
+    };
+
+    function sendPush(title, body) {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(reg => {
+                reg.showNotification(title, { body: body, icon: 'icon-192.png' });
+            });
+        }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('user-msg');
+        const text = input.value.trim();
+        if (!text) return;
+
+        chatBox.innerHTML += `<div class="msg user-msg">${text}</div>`;
+        input.value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        const loading = document.createElement("div");
+        loading.className = "msg ai-msg";
+        loading.innerHTML = "<i>AI ფიქრობს...</i>";
+        chatBox.appendChild(loading);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            // აქ ჩასწორდა v1-ზე
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: text }] }],
+                    safetySettings: [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                    ]
+                })
+            });
+            const data = await res.json();
+            if (data.candidates && data.candidates[0].content) {
+                loading.innerHTML = `<b>AI:</b> ${data.candidates[0].content.parts[0].text}`;
+            } else if (data.error) {
+                loading.innerHTML = `<b>AI შეცდომა:</b> ${data.error.message}`;
+            } else {
+                loading.innerHTML = "<b>AI:</b> პასუხი ვერ მოიძებნა.";
+            }
+        } catch (err) {
+            loading.innerHTML = "<b>AI:</b> კავშირის შეცდომა.";
+        }
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    document.getElementById('send-btn').onclick = sendMessage;
+    document.getElementById('user-msg').onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('firebase-messaging-sw.js');
+    }
+</script>
+</body>
+</html>
